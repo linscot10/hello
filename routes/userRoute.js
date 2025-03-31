@@ -1,5 +1,6 @@
 const express = require('express')
 const UserModel = require('../models/User.model')
+const authMiddleware = require("../middlewares/authMiddlewares")
 
 const router = express.Router()
 
@@ -18,7 +19,7 @@ router.post('/register', async (req, res) => {
         const user = new UserModel({ name, email, password })
         await user.save()
 
-        const token= user.generateToken()
+        const token = user.generateToken()
         if (user) {
             res.status(201).json({
                 success: true,
@@ -32,7 +33,35 @@ router.post('/register', async (req, res) => {
     }
 })
 
-router.post
+router.post('/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await UserModel.findOne({ email })
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid credentials"
+            })
+        }
+
+        const isMatch = await user.comparePassword(password)
+        if (!isMatch) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid credentials"
+            })
+        }
+        const token = await user.generateToken()
+        res.status(201).json({
+            success: true,
+            message: "logged in successfully",
+            user,
+            token
+        })
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server Error", error });
+    }
+})
 
 
 router.get('/', async (req, res) => {
@@ -51,6 +80,19 @@ router.get('/', async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error", error });
     }
 })
+
+
+router.get("/profile", authMiddleware, async (req, res) => {
+    try {
+        const user = await UserModel.findById(req.user.id).select("-password");
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).json({ message: "Server Error", error });
+    }
+});
+
 
 router.get("/:id", async (req, res) => {
     try {
