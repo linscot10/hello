@@ -1,6 +1,7 @@
 const express = require('express')
 const UserModel = require('../models/User.model')
 const authMiddleware = require("../middlewares/authMiddlewares")
+require('dotenv').config()
 
 const router = express.Router()
 
