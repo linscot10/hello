@@ -1,13 +1,20 @@
 const express = require('express')
 const UserModel = require('../models/User.model')
 const authMiddleware = require("../middlewares/authMiddlewares")
+const { adminMiddlware } = require('../middlewares/roleMiddlware')
+// const {adminMiddleware} = require("../middlewares/roleMiddlware")
+
 require('dotenv').config()
 
 const router = express.Router()
 
 router.post('/register', async (req, res) => {
     try {
-        const { name, email, password } = req.body
+        const { name, email, password, role } = req.body
+
+        if (role && !['user', 'admin'].includes(role)) {
+            return res.status(400).json({ message: "Invalid role" });
+        }
         const userExists = await UserModel.findOne({ email })
         if (userExists) {
             return res.status(400).json({
@@ -17,7 +24,7 @@ router.post('/register', async (req, res) => {
         }
 
 
-        const user = new UserModel({ name, email, password })
+        const user = new UserModel({ name, email, password, role: role || 'user' })
         await user.save()
 
         const token = user.generateToken()
@@ -30,6 +37,7 @@ router.post('/register', async (req, res) => {
             })
         }
     } catch (error) {
+        console.log(error)
         res.status(500).json({ success: false, message: "Server Error", error });
     }
 })
@@ -65,6 +73,22 @@ router.post('/login', async (req, res) => {
 })
 
 
+
+router.get("/profile", authMiddleware, async (req, res) => {
+    try {
+        const user = await UserModel.findById(req.user.id).select("-password");
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).json({ message: "Server Error", error });
+    }
+});
+
+router.get("/admin", authMiddleware, adminMiddlware, (req, res) => {
+    res.status(200).json({ message: "Welcome, Admin!", user: req.user });
+});
+
 router.get('/', async (req, res) => {
     try {
         // const users = await UserModel.find();
@@ -82,17 +106,6 @@ router.get('/', async (req, res) => {
     }
 })
 
-
-router.get("/profile", authMiddleware, async (req, res) => {
-    try {
-        const user = await UserModel.findById(req.user.id).select("-password");
-        if (!user) return res.status(404).json({ message: "User not found" });
-
-        res.status(200).json(user);
-    } catch (error) {
-        res.status(500).json({ message: "Server Error", error });
-    }
-});
 
 
 router.get("/:id", async (req, res) => {
